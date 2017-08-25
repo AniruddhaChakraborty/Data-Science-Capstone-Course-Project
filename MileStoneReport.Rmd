@@ -1,0 +1,293 @@
+---
+title: 'Data Science Capstone Project : Milestone Report'
+author: "Aniruddha Chakraborty"
+date: "August 12, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE,message=FALSE,warning=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE,
+	cache = TRUE,
+	tidy = TRUE,
+	tidy.opts = list(width.cutoff = 70)
+)
+```
+
+# Milestone Report - Exploratory analysis and goals for the eventual app and algorithm.
+
+## **Synopsis**  
+
+The goal of this project is just to display that I have gotten used to working with the data and that I am on track to create your prediction algorithm for the Swiftkey Capstone Project. This is a report that explains the exploratory analysis and goals for the eventual app and algorithm. 
+
+Following instructions have been given for the assignment -
+
+1. This document should be concise and explain only the major features of the data you have identified and briefly summarize your plans for creating the prediction algorithm and Shiny app in a way that would be understandable to a non-data scientist manager. 
+
+2. You should make use of tables and plots to illustrate important summaries of the data set. 
+
+The motivation for this project is to: 
+
+1. Demonstrate that you've downloaded the data and have successfully loaded it in.
+2. Create a basic report of summary statistics about the data sets.
+3. Report any interesting findings that you amassed so far.
+4. Get feedback on your plans for creating a prediction algorithm and Shiny app.
+
+## **Loading the data**
+
+Let us now load the whole data using readLines() function. We will be considering only the datasets corresponding to en_US locale for now. It has 3 datasets - blogs, news and twitter.
+
+```{r}
+## Downloading data from course website
+if(!file.exists("Coursera-SwiftKey.zip")){
+  download.file("https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip", "Coursera-SwiftKey.zip")
+  unzip("Coursera-SwiftKey.zip")
+}
+
+Blogs <- readLines("final/en_US/en_US.blogs.txt",skipNul=TRUE,encoding="UTF-8")
+## Opening news.text in binary mode as in default read mode, readLines was not able to read the whole file due to 'incomplete final line found by readLines' error
+con=file("final/en_US/en_US.news.txt","rb")
+News <- readLines(con,skipNul=TRUE,encoding="UTF-8")
+close(con)
+Twitter <- readLines("final/en_US/en_US.twitter.txt",skipNul=TRUE,encoding="UTF-8")
+```
+
+## **Basic Summaries**
+
+Here, we will look at the summaries of the three files. The below table displays the File Size, Line count, Word count, Character count, Average number of words per line, Average number of characters per line, and Maximum number of characters in any line for all three daasets.
+
+```{r}
+library(stringr)
+basic_stats<-c()
+for (x in list(Blogs, News, Twitter)){
+basic_stats <- rbind(basic_stats,data.frame('File Size'=format(object.size(x),"MB"),
+                                            'Line Count' = format(length(x), big.mark= ",",big.interval = 3L),
+                                            'Word Count'= format(sum(str_count(x,'\\w+')),big.mark= ",",big.interval = 3L),
+                                            'Character Count' = format(sum(nchar(x)),big.mark= ",",big.interval = 3L),
+                                            'Avg no of words per line'=round(mean(str_count(x,'\\w+')),2),
+                                            'Avg no of characters per line'=round(mean(nchar(x)),2),
+                                            'Max no of characters in any line' = format(max(nchar(x)),big.mark= ",",big.interval = 3L)))}
+basic_stats<-cbind('Dataset'=c("Blogs","News","Twitter"),basic_stats)
+
+## Display table
+knitr::kable(basic_stats,rownames=FALSE)
+```
+
+## **Data Pre-Processing : Cleaning data**
+
+### **1. Sub-sample datasets**
+
+We know that **a representative sample can be used to infer facts about a population**.  To build models or for exploratory data analysis we don't need to use all of the data. Often relatively few randomly selected rows or chunks need to be included to get an accurate approximation to results that would be obtained using all the data. 
+
+**So,we will create sub-sample datasets and use the rbinom function to "flip a biased coin" to determine whether we sample a line of text or not.** We will sample 5% of the lines for all the datasets.
+
+```{r}
+## Total lines
+ Lines_Blogs=as.numeric(as.character(gsub("," , "", basic_stats[1,3])))
+ Lines_News=as.numeric(as.character(gsub("," , "", basic_stats[2,3])))
+ Lines_Twitter=as.numeric(as.character(gsub("," , "", basic_stats[3,3])))
+  
+## Sample 5% of the lines using rbinom function  
+  set.seed(2017)
+  Blogs_Sub=Blogs[which(as.logical(rbinom(Lines_Blogs,1,0.05)))]
+  News_Sub=News[which(as.logical(rbinom(Lines_News,1,0.05)))]
+  Twitter_Sub=Twitter[which(as.logical(rbinom(Lines_Twitter,1,0.05)))]
+  
+## Remove original datasets
+  rm(x,Blogs,News,Twitter)
+```
+
+### **2. Corpus creation and tidying data**
+
+We will use the Text Mining library in R (tm) to create the Corpus and clean it up for Exploratory Analysis and N-gram Language Modelling.
+
+Decisions that have been taken for the Tokenization issues -
+
+1. **Profanity filtering : **We will remove the Profanity words that we do not want to predict using the profanity list [from this GitHub Repository](https://github.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words/blob/master/en).
+
+2. **Handling punctuations and numbers : **We will remove the punctuations and digits from the corpus as it takes less time for the user to type them and it is very difficult to predict them, in most of the cases.
+
+3. **Uppercase/lowercase letters : **We will convert the corpus to lowercase as users most frequently type in lowercase and this will be very helpful in tokenization and calculating word frequencies.
+
+4. **Website URLs : **We will remove them as they won't help in the prediction task.
+
+4. **Stopwords/Stemming : **For keyboard text prediction, we have to predict the stopwords also to make it easier for the users. So, we will neither be removing stopwords nor stemming documents.
+
+```{r}
+library(tm)
+library(SnowballC)
+## Merge all the sources
+enUS<-c(Blogs_Sub,News_Sub,Twitter_Sub)
+
+## Create Corpus
+corpus = Corpus(VectorSource(enUS),readerControl=list(reader=readPlain,language="en"))
+
+## Remove sub-samples
+rm(Blogs_Sub,News_Sub,Twitter_Sub,enUS)
+
+## Remove non-ASCII to avoid invalid input error in tm_map function
+corpus <- Corpus(VectorSource(sapply(corpus, function(row) iconv(row, "latin1", "ASCII", sub="")))) 
+
+## Remove URLs
+removeURL = function(x) gsub("http\\w+", "", x)
+corpus = tm_map(corpus, content_transformer(removeURL))
+
+## Remove Punctuations, Numbers and convert to lowercase
+corpus = tm_map(corpus, removePunctuation)
+corpus = tm_map(corpus, removeNumbers)
+corpus = tm_map(corpus, content_transformer(tolower))
+
+## Remove Profanity words
+profanity = read.csv("profanity_en.txt",header=FALSE, stringsAsFactors=FALSE)
+profanity <- profanity$V1
+corpus <- tm_map(corpus, removeWords, profanity)
+
+## Remove whitespace
+corpus<- tm_map(corpus, stripWhitespace)
+```
+
+## **Exploratory Data Analysis : n-grams**
+
+### **n-grams**
+
+To build the higher order n-grams we will use the [**{ngram} package**](https://cran.r-project.org/web/packages/ngram/vignettes/ngram-guide.pdf). **It is used for fast n-gram tokenization.**
+
+An n-gram is an ordered sequence of n words taken from a body of text. If we form all of the n-grams and record the next words for each n-gram (and their frequency), then we can generate new text which has the same statistical properties as the input.
+
+**The ngram package (Schmidt, 2016) is an R package for constructing n-grams and generating new text as described above. So, we can use it for our keyboard text prediction task.**
+
+To use tm-encapsulated data, we will first need to extract it into a single string. Let us do that.
+
+```{r}
+library(ngram)
+str <- concatenate(lapply(corpus,"[",1))
+
+## Remove corpus
+rm(corpus)
+```
+
+We can generate some basic summary counts very quickly via the string.summary() function :
+
+```{r}
+string.summary (str)
+```
+
+### **Analysis of Individual Words (Unigrams)**
+
+**We will be generating the word frequency table using tidytext and Tokenizers package.** The **unnest_tokens** function helps us to split a column into tokens using the tokenizers package, splitting the table into one-token-per-row.
+
+This process is much faster for analyzing Unigrams than building them using ngram/RWeka package.
+
+We will analyze the 30 most common unigrams and their histogram now. 
+
+```{r}
+library(tidytext)
+library(dplyr)
+d<-data_frame(txt=str)
+
+## Creating Word count table (Unigrams and their frequencies)
+WordCount <- d %>%unnest_tokens(word,txt) %>%count(word, sort = TRUE) %>%ungroup()
+WordCount=data.frame(ngrams=WordCount$word,freq=WordCount$n)
+
+## Top 30 most common unigrams
+UniTable=head(WordCount,30)
+
+## Remove d
+rm(d)
+
+## Display the top 30 most common unigrams
+UniTable
+```
+
+Now, let us look at the Histogram of the 30 most common unigrams or individual words.
+
+```{r}
+library(ggplot2)
+ggplot(data = UniTable, aes(x = reorder(ngrams, -freq), y = freq)) + 
+geom_bar(stat = "identity")+ labs(x = "Unigram", y = "Frequency",title = "30 most common Unigrams and their frequencies")+ theme(axis.text.x = element_text(angle = 90))
+```
+
+### **Interesting findings - How many unique words are needed in a frequency sorted dictionary to cover 50% of all word instances in our sub-sampled dataset? 90%?**
+
+```{r}
+
+## Calculate cumulative proportion
+CumProp<-WordCount %>%mutate(prop = freq/sum(freq), cumprop = round(cumsum(prop),2)) %>% arrange(desc(freq))
+
+## Unique words required to cover 50% of all word instances our sub-sampled dataset
+which.max(CumProp$cumprop==.5)
+
+## Unique words required to cover 90% of all word instances our sub-sampled dataset
+which.max(CumProp$cumprop==.9)
+
+## Remove WordCount,CumProp
+rm(WordCount,CumProp)
+```
+
+### **Generating higher order n-grams**
+
+Let us generate some n-grams now up to the order-4. The simplest case is the unigram which is of order-1 and it consists of individual words. The bigram consists of pairs of words and so on. 
+
+```{r}
+library(ngram)
+Quadgrams<-ngram(str,n=4)
+Trigrams<-ngram(str,n=3)
+Bigrams<-ngram(str,n=2)
+
+## Remove str
+rm(str)
+```
+
+### **Bigrams**
+
+Once the ngram representation of the text has been generated, it is very simple to get some interesting summary information. The function get.phrasetable() generates a phrasetable,or more explicitly, a table of n-grams, and their frequency and proportion in the text:
+
+We will analyze the 30 most common bigrams and their histogram now.
+
+```{r}
+BiTable=head(get.phrasetable(Bigrams),30)
+BiTable
+
+## Histogram
+ggplot(data = BiTable, aes(x = reorder(ngrams,-freq), y = freq)) + geom_bar(stat="identity")+ labs(x = "Bigram", y = "Frequency", title = "30 most common Bigrams and their frequencies")+ theme(axis.text.x=element_text(angle=90))
+```
+
+### **Trigrams**
+
+We will analyze the 30 most common Trigrams and their histogram now.
+
+```{r}
+TriTable=head(get.phrasetable(Trigrams),30)
+TriTable
+
+## Histogram
+ggplot(data = TriTable, aes(x = reorder(ngrams,-freq), y = freq)) + geom_bar(stat="identity")+ labs(x = "Trigram", y = "Frequency", title = "30 most common Trigrams and their frequencies")+ theme(axis.text.x=element_text(angle=90))
+```
+
+### **Quadgrams**
+
+We will analyze the 30 most common quadgrams and their histogram now.
+
+```{r}
+QuadTable=head(get.phrasetable(Quadgrams),30)
+QuadTable
+
+## Histogram
+ggplot(data = QuadTable, aes(x = reorder(ngrams,-freq), y = freq)) + geom_bar(stat="identity")+ labs(x = "Quadgram", y = "Frequency", title = "30 most common Quadgrams and their frequencies")+ theme(axis.text.x=element_text(angle=90))
+```
+
+## **Goals for Prediction Algorithm and Shiny App**
+
+1. Now that I have created the Unigrams, Bigrams, Trigrams and Quadgrams, I will **consolidate all the n-grams into one corpus** and incorporate the same in the 'Next text prediction algorithm'. Note - Unigrams will not help us in the text prediction task, so they will not been considered in the Prediction Algorithm.
+
+2. I will get the User Input from the UI of Shiny App and search for all the matches in the n-grams corpus. Then, among the returned matches I will **find the highest probability words based on the frequency of n-grams** and return the same to the user as the predicted word.
+
+3. In other words, I will **match an n-word input character string with the appropriate n+1 gram entry in the n-gram corpus**. If there is a match, the predicted word will be the last word of the n-gram. For example, if a user enters 2 words, and it matches with the first two words of a Trigram, then the predicted word will be the third word of the Trigram. Ofcourse, only the highest frequency words will be proposed to the user.
+
+4. We can also use babble() function from the {ngram} package to easily generate new strings with the same statistical properties as the input strings via a very simple **markov chain/sampling scheme**. I need to further explore this function and see if it can be used to make things easier.
+
+5. I am planning to use **Kneser-Ney smoothing algorithm to handle the n-grams with zero probability or unseen n-grams**, which do not appear in our corpus. This algorithm steals some probability mass from frequently appearing n-grams and gives it to unseen n-grams in order to improve prediction estimates for them.
+
+6. **Perplexity**, which is an Intrinsic evaluation will be used to evaluate the performance of our text prediction model.
