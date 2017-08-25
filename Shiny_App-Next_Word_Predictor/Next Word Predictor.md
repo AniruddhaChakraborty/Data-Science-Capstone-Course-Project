@@ -21,7 +21,7 @@ The Next Word Predictor App - Snapshot
 ![The Next Word Predictor App - Snapshot](Next_Word_Predictor_App.png)
 <h5>Resources :</h5>
 <small>1. [Link to the Next Word Predictor Shiny Application.](https://aniruddhachakraborty.shinyapps.io/Shiny_App-Next_Word_Predictor/)  
-2. [Link to the Github Repository containing all R codes including ui.R, server.R and Interpolation Prediction Algorithm.](https://github.com/AniruddhaChakraborty/Data-Science-Capstone-Course-Project/Shiny_App-Next_Word_Predictor)  
+2. [Link to the Github Repository containing all R codes including ui.R, server.R and Interpolation Prediction Algorithm.](https://github.com/AniruddhaChakraborty/Data-Science-Capstone-Course-Project/tree/master/Shiny_App-Next_Word_Predictor)  
 </small>
 Prediction Algorithm used - Simple/Linear Interpolation
 ========================================================

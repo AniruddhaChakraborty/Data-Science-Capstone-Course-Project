@@ -4,15 +4,15 @@
 
   
 
-# [Link to the Rpubs Reproducible Pitch presentation on the Next Word Predictor App.](http://rpubs.com/AniruddhaChakraborty/301935)
+# [Link to the Rpubs Reproducible Pitch presentation on the Next Word Predictor App.](http://rpubs.com/AniruddhaChakraborty/301943)
 
   
 
-# [Link to the ui.R and server.R files.](https://github.com/AniruddhaChakraborty/Data-Science-Capstone-Course-Project/Shiny_App-Next_Word_Predictor)
+# [Link to the ui.R and server.R files.](https://github.com/AniruddhaChakraborty/Data-Science-Capstone-Course-Project/tree/master/Shiny_App-Next_Word_Predictor)
 
   
 
-# [Link to the source code of n-gram Language model (ngrams.R) and Interpolation Prediction Algorithm (PredictionAlgorithm_Interpolation_datatable.R).](https://github.com/AniruddhaChakraborty/Data-Science-Capstone-Course-Project/Next_Word_Predictor)
+# [Link to the source code of n-gram Language model (ngrams.R) and Interpolation Prediction Algorithm (PredictionAlgorithm_Interpolation_datatable.R).](https://github.com/AniruddhaChakraborty/Data-Science-Capstone-Course-Project/tree/master/Next_Word_Predictor)
 
 ## Following instructions have been given for the assignment -
 
